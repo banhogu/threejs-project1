@@ -1,6 +1,7 @@
 import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 // renderer(송출 기계)
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -8,9 +9,6 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 // renderer가 그림자를 나타낼 수 있도록 함
 renderer.shadowMap.enabled = true;
 
-// renderer의 shadowMap 종류
-// renderer.shadowMap.type = THREE.BasicShadowMap; // 품질은 가장 낮고, 성능은 가장 좋음
-// renderer.shadowMap.type = THREE.PCFShadowMap; // 품질은 중간, 성능도 중간
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 품질은 가장 좋음, 성능은 가장 낮음
 
 // renderer 크기 설정
@@ -27,7 +25,7 @@ const camera = new THREE.PerspectiveCamera(
   60, // fov(시야각)
   window.innerWidth / window.innerHeight, // 카메라가 담을 가로 세로 비율
   0.1, // 카메라가 피사체를 담을 수 있는 범위의 하한
-  100 // 카메라가 피사체를 담을 수 있는 범위의 상한
+  1000 // 카메라가 피사체를 담을 수 있는 범위의 상한
 );
 
 // 바닥 만들기
@@ -39,19 +37,6 @@ floor.position.y = 0;
 floor.receiveShadow = true;
 floor.castShadow = true;
 scene.add(floor);
-
-const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-const boxMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 });
-const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-boxMesh.castShadow = true;
-boxMesh.receiveShadow = true;
-boxMesh.position.y = 0.5;
-scene.add(boxMesh);
-
-// 카메라 위치의 z 좌표 변경
-// camera.position.z = 5;
-camera.position.set(5, 5, 5);
-camera.lookAt(0, 0, 0);
 
 // 화면 사이즈가 변경될 때
 window.addEventListener("resize", () => {
@@ -68,6 +53,27 @@ window.addEventListener("resize", () => {
   renderer.render(scene, camera);
 });
 
+const gltfLoader = new GLTFLoader();
+// gltfLoader.load("/dancer.glb", (data) => {
+//   console.log(data);
+//   scene.add(data.scene);
+// });
+
+const gltf = await gltfLoader.loadAsync("/dancer.glb");
+console.log(gltf.scene);
+const character = gltf.scene;
+character.position.y = 0.8;
+character.scale.set(0.01, 0.01, 0.01);
+character.traverse((mesh) => {
+  if (mesh.isMesh) {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  }
+});
+scene.add(character);
+
+camera.position.set(1, 2, 2);
+
 // DirectionalLight
 // ==> 직사광선(태양 빛을 연상하면 됨)
 // ==> 그림자 O
@@ -76,23 +82,21 @@ directionalLight.castShadow = true; // 빛이 그림자를 만들 수 있게 함
 directionalLight.position.set(3, 4, 5); // 빛의 위치 설정
 directionalLight.lookAt(0, 0, 0); // 빛이 향하는 방향 설정
 
-directionalLight.shadow.mapSize.width = 4096; // 그림자 맵의 가로 퀄리티
-directionalLight.shadow.mapSize.height = 4096; // 그림자 맵의 세로 퀄리티
-
-// directionalLight.shadow.camera.top = 0.5; // 그림자가 그려질 수 있는 위쪽 경계
-// directionalLight.shadow.camera.bottom = -0.5; // 그림자가 그려질 수 있는 아래쪽 경계
-// directionalLight.shadow.camera.left = -0.5; // 그림자가 그려질 수 있는 왼쪽 경계
-// directionalLight.shadow.camera.right = 0.5; // 그림자가 그려질 수 있는 오른쪽 경계
-
+directionalLight.shadow.mapSize.width = 4096; // 그림자 맵의 너비
+directionalLight.shadow.mapSize.height = 4096; // 그림자 맵의 높이
 directionalLight.shadow.camera.near = 0.1; // 그림자가 그려질 수 있는 빛과의 최소 거리
-directionalLight.shadow.camera.far = 100; // 그림자가 그려질 수 있는 빛과의 최대 거리
+directionalLight.shadow.camera.far = 500; // 그림자가 그려질 수 있는 빛과의 최대 거리
 scene.add(directionalLight);
 
 // 마우스로 카메라 시점을 조작함
+// OrbitControls;
 const orbitControls = new OrbitControls(camera, renderer.domElement);
-orbitControls.update();
+orbitControls.enableDamping = true; // 기본값: false, 카메라 시점을 돌릴 때, 바로 멈추는게 아닌, 좀 더 진행방향으로 이동 후 멈추는 효과 (update 메소드를 애니메이션 프레임 안에서 실행해야 정상적으로 동작함)
+orbitControls.dampingFactor = 0.03; // 기본값: 0.05, enableDamping이 true일 때, 값이 작아질수록 더욱 부드럽게 정지됨
 
 const render = () => {
+  orbitControls.update(); // OrbitControls의 enableDamping 효과를 적용하려면 애니메이션 루프 안에서 update 메소드를 실행해야함
+
   renderer.render(scene, camera);
   // 애니메이션 프레임 루프에서 재귀적으로 계속 렌더함수를 호출하여 애니메이션 처리
   requestAnimationFrame(render);
